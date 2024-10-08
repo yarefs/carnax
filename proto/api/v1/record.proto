@@ -7,18 +7,35 @@ message Record {
 
   bytes payload = 2;
 
-  RecordMetadata metadata = 3;
+  Metadata metadata = 3;
+  Headers headers = 4;
 
   // the record is hashed with crc-32
   // nit: in kafka apparently record level
   // checksum is replaced by batch-level checksum
-  uint32 checksum = 4;
+  uint32 checksum = 5;
 }
 
-message RecordMetadata {
-  uint32 timestamp = 1;
+// Headers are metadata on a record
+// that are eligible to be overriden by
+// producing clients.
+// They should _ideally_ map to an existing field in
+// the Metadata type.
+message Headers {
+  int64 timestamp = 1;
+}
+
+// Metadata is immutable data about the record
+// that is generated before it is written to the log
+// it is not permissible to override this information
+message Metadata {
+  int64 timestamp = 1;
+
   uint64 offset = 2;
+
   uint64 relative_offset = 3;
+
   int32 key_uncompressed_length = 4;
+
   int32 value_uncompressed_length = 5;
 }

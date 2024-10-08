@@ -234,6 +234,11 @@ func (f *CarnaxControllerFSM) applyFlushSegment() interface{} {
 				}
 
 				// .timeindex	(timestamp to offs?)
+				key = fmt.Sprintf("%s-%d/%020d.timeindex", topicName, partition, seg.start)
+				err = f.storeBackedLog.Put(key, seg.TimeIndex())
+				if err != nil {
+					panic(err)
+				}
 			}
 		}()
 	}
@@ -299,7 +304,7 @@ func (f *CarnaxControllerFSM) tryReadWithSegmentCacheHistory(topic string, addre
 	allSegmentPaths := f.storeBackedLog.List(string(hash))
 	segmentFolderPath := findLowestSegmentFile(allSegmentPaths, address.Offset)
 
-	// 1. find the index file.
+	// 1. find the offsIndex file.
 	// .index file format is offset:byte_offset
 	indexFilePath, err := func() (string, error) {
 		indexSearchKey := fmt.Sprintf("%s/%s.index", string(hash), segmentFolderPath)
@@ -311,7 +316,7 @@ func (f *CarnaxControllerFSM) tryReadWithSegmentCacheHistory(topic string, addre
 		return "", ErrNoIndexFound
 	}()
 	if err == ErrNoIndexFound {
-		log.Println("no index found  for " + string(hash))
+		log.Println("no offsIndex found  for " + string(hash))
 		return nil
 	}
 
@@ -320,16 +325,23 @@ func (f *CarnaxControllerFSM) tryReadWithSegmentCacheHistory(topic string, addre
 		panic(err)
 	}
 
-	// 2. find entry in index file
+	// 2. find entry in offsIndex file
 	// binary search it.
-	// index file maps offset -> bytes position in file to return
+	// offsIndex file maps offset -> bytes position in file to return
 	indexFile := IndexFromBytes(indexData)
 	log.Println("IndexFile:", indexFilePath, ";", len(indexFile), "indices.")
 
-	idxFile := IndexFile(indexFile)
-
-	// BUG(FELIX): We don't handle misses in the index.
-	pos := idxFile.Search(address.Offset)
+	// BUG(FELIX): We don't handle misses in the offsIndex.
+	pos := indexFile.Search(address.Offset)
+	if pos == nil {
+		// MISS! We mock this address offset to position 0
+		// but really we should handle this some other way...
+		// FIXME!
+		pos = &apiv1.Index{
+			Offset:   address.Offset,
+			Position: 0,
+		}
+	}
 
 	log.Println("Addr", address.Offset, "is offs:", pos.Offset, "byte pos:", pos.Position, "point", point)
 

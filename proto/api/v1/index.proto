@@ -1,0 +1,8 @@
+syntax = "proto3";
+
+package api.v1;
+
+message Index {
+  uint64 offset = 1;
+  uint64 position = 2;
+}

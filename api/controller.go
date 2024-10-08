@@ -80,7 +80,7 @@ func ParseFromProperties(props Properties) CarnaxConfig {
 		// ADJUST!
 		LogSegmentBytes:       props.int("log.segment.bytes", 0),
 		LogIndexIntervalBytes: props.int("log.index.interval.bytes", 4096),
-		IndexIntervalBytes:    props.int("index.interval.bytes", 4*KiB),
+		IndexIntervalBytes:    props.int("offsIndex.interval.bytes", 4*KiB),
 
 		MaxPollRecords:  props.int("max.poll.records", 500),
 		MaxMessageBytes: props.int("max.message.bytes", 1*MiB),

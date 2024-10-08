@@ -522,26 +522,40 @@ func (c *carnaxTestSuite) TestSharedMessageLog_SinglePartition_MultipleSegment_S
 }
 
 func (c *carnaxTestSuite) TestIndexByTimestampToOffset() {
+	// TODO Configure to write index after every msg.
+
 	err := c.controller.CreateTopic(&apiv1.TopicConfig{
 		Name:           "some_topic",
 		PartitionCount: 1,
 	})
 	assert.NoError(c.T(), err)
 
-	// write a message with some metadata on the timestamp
-	_, err = c.controller.Write("some_topic", &apiv1.Record{
-		Key:     nil,
-		Payload: []byte("felix"),
-	})
-	assert.NoError(c.T(), err)
+	// Given a week of writes...
 
-	// FIRST SEGMENT/SECOND WRITE.
-	_, err = c.controller.Write("some_topic", &apiv1.Record{
-		Key:     nil,
-		Payload: []byte("loves"),
-	})
-	assert.NoError(c.T(), err)
+	span := 7 // days
+	day := 24 * time.Hour
+	startTime := time.Now().Add(7 * day)
+
+	for i := 0; i <= span; i += 1 {
+		// write a message with some metadata on the timestamp
+		_, err = c.controller.Write("some_topic", &apiv1.Record{
+			Key:     nil,
+			Payload: []byte(fmt.Sprintf("Record written on day %d", i+1)),
+
+			Headers: &apiv1.Headers{
+				Timestamp: startTime.UnixMilli(),
+			},
+		})
+		assert.NoError(c.T(), err)
+
+		startTime.Add(1 * day)
+	}
 
 	err = c.controller.Flush()
 	assert.NoError(c.T(), err)
+
+	// setup a consumer,
+	// seek to offset by timestamp
+	// poll message
+	// done
 }

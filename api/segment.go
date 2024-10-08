@@ -2,24 +2,18 @@ package api
 
 import (
 	"bytes"
-	"encoding/binary"
 	"github.com/hashicorp/go-uuid"
 	apiv1 "github.com/yarefs/carnax/gen/api/v1"
 	"google.golang.org/protobuf/encoding/protodelim"
 	"google.golang.org/protobuf/proto"
 	"hash/crc32"
 	"log"
+	"time"
 )
 
-// offset -> byte position
-type Index struct {
-	Offset   uint64
-	Position uint64
-}
-
 type TopicPartitionSegment struct {
-	datas *bytes.Buffer // .log
-	index []Index       // .index
+	dataLog   *bytes.Buffer // .log
+	offsIndex *bytes.Buffer // .index
 	// .timeindex TBD
 
 	len   uint64
@@ -30,35 +24,62 @@ type TopicPartitionSegment struct {
 
 	bytesSinceLastIndexWrite uint64
 	config                   CarnaxConfig
+
+	timeIndex *bytes.Buffer
 }
 
-func (s *TopicPartitionSegment) Append(payload *apiv1.Record, offset uint64) {
+func (s *TopicPartitionSegment) Append(rec *apiv1.Record, offset uint64) {
 	// specify watermark for this topic
 	if offset < s.low {
 		s.low = offset
 	}
 
+	// the initial length of the segment
+	// which is the position this message will be written at.
+	initialWritePosition := s.len
+
 	if s.shouldWriteIndex() {
-		s.index = append(s.index, Index{
+		_, err := protodelim.MarshalTo(s.offsIndex, &apiv1.Index{
 			Offset:   offset,
 			Position: s.len,
 		})
+		if err != nil {
+			panic(err)
+		}
 		s.bytesSinceLastIndexWrite = 0
 	}
 
-	recordWithOffsBytes, err := proto.Marshal(payload)
+	// if should write to time offsIndex...
+	//s.timeIndex.Write()
+
+	recordBytes, err := proto.Marshal(rec)
 	if err != nil {
 		panic("Failed to marshal record")
 	}
 
+	// in most cases the metadata will not be set
+	// however, it is permissible, though unsafe, for
+	// producing clients to mangle this data if absolutely necessary.
+	if rec.Metadata != nil {
+		panic("invalid state: metadata is immutable state that is generated when committed to the log")
+	} else {
+		rec.Metadata = &apiv1.Metadata{
+			Timestamp:               time.Now().UnixMilli(),
+			Offset:                  offset,
+			KeyUncompressedLength:   int32(len(rec.Key)),
+			ValueUncompressedLength: int32(len(rec.Payload)),
+			RelativeOffset:          initialWritePosition,
+		}
+	}
+
 	// defensive measure to ensure checksums are only set once.
-	if payload.Checksum != 0 {
+	if rec.Checksum != 0 {
 		panic("invalid state: checksum must not be set")
 	}
 
-	payload.Checksum = crc32.ChecksumIEEE(recordWithOffsBytes)
+	rec.Checksum = crc32.ChecksumIEEE(recordBytes)
 
-	numBytesWritten, err := protodelim.MarshalTo(s.datas, payload)
+	numBytesWritten, err := protodelim.MarshalTo(s.dataLog, rec)
 	if err != nil {
 		panic(err)
 	}
@@ -72,11 +93,12 @@ func (s *TopicPartitionSegment) Append(payload *apiv1.Record, offset uint64) {
 	s.bytesSinceLastIndexWrite += uint64(numBytesWritten)
 }
 
-type IndexFile []Index
+// hm...
+type IndexFile []*apiv1.Index
 
-func (i IndexFile) Search(offs uint64) Index {
+func (i IndexFile) Search(offs uint64) *apiv1.Index {
 	if len(i) == 0 {
-		return Index{offs, 0}
+		return nil
 	}
 
 	log.Println("IndexFile Search:", offs, "Index Dump:")
@@ -104,63 +126,33 @@ func (i IndexFile) Search(offs uint64) Index {
 	return i[best]
 }
 
-func IndexFromBytes(data []byte) []Index {
+func IndexFromBytes(data []byte) IndexFile {
 	buf := bytes.NewBuffer(data)
 
-	var res []Index
+	var res IndexFile
 
 	for buf.Len() > 0 {
-		offset := uint64(0)
-		err := binary.Read(buf, binary.BigEndian, &offset)
-		if err != nil {
+		indexEntry := new(apiv1.Index)
+		if err := protodelim.UnmarshalFrom(buf, indexEntry); err != nil {
 			panic(err)
 		}
 
-		position := uint64(0)
-		err = binary.Read(buf, binary.BigEndian, &position)
-		if err != nil {
-			panic(err)
-		}
-
-		res = append(res, Index{
-			Offset:   offset,
-			Position: position,
-		})
+		res = append(res, indexEntry)
 	}
 
 	return res
 }
 
-// segment.index.bytes
-// This configuration controls the size of the index that maps offsets to file positions.
-// We preallocate this index file and shrink it only after log rolls. You generally should not need to change this setting
 func (s *TopicPartitionSegment) Index() []byte {
-	// NOTE: in the future we can opt for an unsafe
-	// packing into a []byte array.
-	// we could also seprate them into different arrays for better
-	// caching
-
-	buf := new(bytes.Buffer)
-
-	for _, index := range s.index {
-		// NOTE: Kafka is binary.BigEndian
-
-		err := binary.Write(buf, binary.BigEndian, index.Offset)
-		if err != nil {
-			panic(err)
-		}
-
-		err = binary.Write(buf, binary.BigEndian, index.Position)
-		if err != nil {
-			panic(err)
-		}
-	}
-
-	return buf.Bytes()
+	return s.offsIndex.Bytes()
 }
 
 func (s *TopicPartitionSegment) Data() []byte {
-	return s.datas.Bytes()
+	return s.dataLog.Bytes()
+}
+
+func (s *TopicPartitionSegment) TimeIndex() []byte {
+	return []byte{}
 }
 
 func (s *TopicPartitionSegment) shouldWriteIndex() bool {
@@ -174,7 +166,9 @@ func NewTopicPartitionSegment(config CarnaxConfig, start ...uint64) *TopicPartit
 	*/
 
 	ts := &TopicPartitionSegment{
-		datas: new(bytes.Buffer),
+		dataLog:   new(bytes.Buffer),
+		offsIndex: new(bytes.Buffer),
+		timeIndex: new(bytes.Buffer),
 
 		// specify watermarks at peak values
 		// so writes after nullify to the real range.
