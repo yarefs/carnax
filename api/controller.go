@@ -3,12 +3,12 @@ package api
 import (
 	"bytes"
 	"errors"
-	"github.com/golang/protobuf/proto"
 	"github.com/hashicorp/raft"
 	apiv1 "github.com/yarefs/carnax/gen/api/v1"
 	commandv1 "github.com/yarefs/carnax/gen/command/v1"
 	controllerv1 "github.com/yarefs/carnax/gen/controller/v1"
 	"google.golang.org/protobuf/encoding/protodelim"
+	"google.golang.org/protobuf/proto"
 	"hash/crc32"
 	"log"
 	"strings"

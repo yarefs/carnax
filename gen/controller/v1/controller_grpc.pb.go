@@ -19,8 +19,9 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	CarnaxService_CreateTopic_FullMethodName = "/controller.v1.CarnaxService/CreateTopic"
-	CarnaxService_Publish_FullMethodName     = "/controller.v1.CarnaxService/Publish"
+	CarnaxService_CreateTopic_FullMethodName  = "/controller.v1.CarnaxService/CreateTopic"
+	CarnaxService_Publish_FullMethodName      = "/controller.v1.CarnaxService/Publish"
+	CarnaxService_BatchPublish_FullMethodName = "/controller.v1.CarnaxService/BatchPublish"
 )
 
 // CarnaxServiceClient is the client API for CarnaxService service.
@@ -29,6 +30,7 @@ const (
 type CarnaxServiceClient interface {
 	CreateTopic(ctx context.Context, in *CreateTopicRequest, opts ...grpc.CallOption) (*CreateTopicResponse, error)
 	Publish(ctx context.Context, in *PublishRequest, opts ...grpc.CallOption) (*PublishResponse, error)
+	BatchPublish(ctx context.Context, in *BatchPublishRequest, opts ...grpc.CallOption) (*BatchPublishResponse, error)
 }
 
 type carnaxServiceClient struct {
@@ -59,12 +61,23 @@ func (c *carnaxServiceClient) Publish(ctx context.Context, in *PublishRequest, o
 	return out, nil
 }
 
+func (c *carnaxServiceClient) BatchPublish(ctx context.Context, in *BatchPublishRequest, opts ...grpc.CallOption) (*BatchPublishResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(BatchPublishResponse)
+	err := c.cc.Invoke(ctx, CarnaxService_BatchPublish_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // CarnaxServiceServer is the server API for CarnaxService service.
 // All implementations must embed UnimplementedCarnaxServiceServer
 // for forward compatibility.
 type CarnaxServiceServer interface {
 	CreateTopic(context.Context, *CreateTopicRequest) (*CreateTopicResponse, error)
 	Publish(context.Context, *PublishRequest) (*PublishResponse, error)
+	BatchPublish(context.Context, *BatchPublishRequest) (*BatchPublishResponse, error)
 	mustEmbedUnimplementedCarnaxServiceServer()
 }
 
@@ -80,6 +93,9 @@ func (UnimplementedCarnaxServiceServer) CreateTopic(context.Context, *CreateTopi
 }
 func (UnimplementedCarnaxServiceServer) Publish(context.Context, *PublishRequest) (*PublishResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Publish not implemented")
+}
+func (UnimplementedCarnaxServiceServer) BatchPublish(context.Context, *BatchPublishRequest) (*BatchPublishResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method BatchPublish not implemented")
 }
 func (UnimplementedCarnaxServiceServer) mustEmbedUnimplementedCarnaxServiceServer() {}
 func (UnimplementedCarnaxServiceServer) testEmbeddedByValue()                       {}
@@ -138,6 +154,24 @@ func _CarnaxService_Publish_Handler(srv interface{}, ctx context.Context, dec fu
 	return interceptor(ctx, in, info, handler)
 }
 
+func _CarnaxService_BatchPublish_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(BatchPublishRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CarnaxServiceServer).BatchPublish(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CarnaxService_BatchPublish_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CarnaxServiceServer).BatchPublish(ctx, req.(*BatchPublishRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // CarnaxService_ServiceDesc is the grpc.ServiceDesc for CarnaxService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -152,6 +186,10 @@ var CarnaxService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Publish",
 			Handler:    _CarnaxService_Publish_Handler,
+		},
+		{
+			MethodName: "BatchPublish",
+			Handler:    _CarnaxService_BatchPublish_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

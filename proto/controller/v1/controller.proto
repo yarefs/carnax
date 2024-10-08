@@ -31,8 +31,17 @@ message PublishResponse {
   bool ok = 1;
 }
 
+message BatchPublishRequest {
+  repeated PublishRequest requests = 1;
+}
+
+message BatchPublishResponse {
+  
+}
+
 service CarnaxService {
   rpc CreateTopic(CreateTopicRequest) returns (CreateTopicResponse);
 
   rpc Publish(PublishRequest) returns (PublishResponse);
+  rpc BatchPublish(BatchPublishRequest) returns (BatchPublishResponse);
 }

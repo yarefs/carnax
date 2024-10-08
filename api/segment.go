@@ -3,10 +3,10 @@ package api
 import (
 	"bytes"
 	"encoding/binary"
-	"github.com/golang/protobuf/proto"
 	"github.com/hashicorp/go-uuid"
 	apiv1 "github.com/yarefs/carnax/gen/api/v1"
 	"google.golang.org/protobuf/encoding/protodelim"
+	"google.golang.org/protobuf/proto"
 	"hash/crc32"
 	"log"
 )
