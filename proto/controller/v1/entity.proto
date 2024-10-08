@@ -1,0 +1,8 @@
+syntax = "proto3";
+
+package controller.v1;
+
+message TopicPartition {
+  string topic = 1;
+  uint64 partition_index = 2;
+}

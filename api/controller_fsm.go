@@ -80,7 +80,7 @@ func (f *CarnaxControllerFSM) Apply(l *raft.Log) interface{} {
 		return f.applyCommitSync(sc.ConsumerGroupId)
 	case commandv1.CommandType_COMMAND_TYPE_SOFT_COMMIT:
 		sc := cmd.GetSoftCommit()
-		return f.applySoftCommit(sc.ConsumerGroupId, sc.ClientId, sc.PartitionIndex, sc.NextOffsetDelta)
+		return f.applySoftCommit(sc.ConsumerGroupId, sc.ClientId, sc.PartitionIndex, sc.Offset)
 	default:
 		panic("Command is not handled " + cmd.Type.String())
 	}
@@ -297,17 +297,17 @@ func (f *CarnaxControllerFSM) applyReadMessage(topic string, address *commandv1.
 }
 
 func (f *CarnaxControllerFSM) tryReadWithSegmentCacheHistory(topic string, address *commandv1.Address, point commandv1.ResetPoint) interface{} {
-	hash := tpHash(topic, address.PartitionIndex)
+	hash := newTopicHash(topic, address.PartitionIndex)
 
-	log.Println("READ:", internal.FormatAddr(address), "RP:", point, hash)
+	log.Println("READ:", internal.FormatAddr(address), "RP:", point, hash.String())
 
-	allSegmentPaths := f.storeBackedLog.List(string(hash))
+	allSegmentPaths := f.storeBackedLog.List(hash.String())
 	segmentFolderPath := findLowestSegmentFile(allSegmentPaths, address.Offset)
 
 	// 1. find the offsIndex file.
 	// .index file format is offset:byte_offset
 	indexFilePath, err := func() (string, error) {
-		indexSearchKey := fmt.Sprintf("%s/%s.index", string(hash), segmentFolderPath)
+		indexSearchKey := fmt.Sprintf("%s/%s.index", hash.String(), segmentFolderPath)
 		res := f.storeBackedLog.List(indexSearchKey)
 		log.Println("INDEX_LU", indexSearchKey)
 		if len(res) == 1 {
@@ -316,7 +316,7 @@ func (f *CarnaxControllerFSM) tryReadWithSegmentCacheHistory(topic string, addre
 		return "", ErrNoIndexFound
 	}()
 	if err == ErrNoIndexFound {
-		log.Println("no offsIndex found  for " + string(hash))
+		log.Println("no offsIndex found  for " + hash.String())
 		return nil
 	}
 
@@ -345,7 +345,7 @@ func (f *CarnaxControllerFSM) tryReadWithSegmentCacheHistory(topic string, addre
 
 	log.Println("Addr", address.Offset, "is offs:", pos.Offset, "byte pos:", pos.Position, "point", point)
 
-	logSearchKey := fmt.Sprintf("%s/%s.log", string(hash), segmentFolderPath)
+	logSearchKey := fmt.Sprintf("%s/%s.log", hash.String(), segmentFolderPath)
 	log.Println("DataFile:", logSearchKey)
 	logSegmentFileData, err := f.storeBackedLog.Get(logSearchKey)
 	if err != nil {
@@ -558,7 +558,7 @@ func (f *CarnaxControllerFSM) applyCommitSync(id string) interface{} {
 }
 
 func (f *CarnaxControllerFSM) tryFindInCache(topic string, address *commandv1.Address) (*apiv1.Record, bool) {
-	sc, ok := f.segmentCache[tpHash(topic, address.PartitionIndex)]
+	sc, ok := f.segmentCache[newTopicHash(topic, address.PartitionIndex)]
 	if !ok {
 		return nil, false
 	}
@@ -595,10 +595,10 @@ func (f *CarnaxControllerFSM) tryFindInCache(topic string, address *commandv1.Ad
 }
 
 func (f *CarnaxControllerFSM) cacheSegment(topic string, address *commandv1.Address, reader []byte) {
-	sc, ok := f.segmentCache[tpHash(topic, address.PartitionIndex)]
+	sc, ok := f.segmentCache[newTopicHash(topic, address.PartitionIndex)]
 	if !ok {
 		sc = newSegmentCache()
-		f.segmentCache[tpHash(topic, address.PartitionIndex)] = sc
+		f.segmentCache[newTopicHash(topic, address.PartitionIndex)] = sc
 	}
 
 	sc.cacheSeg(address.Offset, reader)

@@ -143,7 +143,7 @@ message SoftCommitCommand {
   string consumer_group_id = 1;
   string client_id = 2;
   uint32 partition_index = 3;
-  uint64 next_offset_delta = 4;
+  uint64 offset = 4;
 }
 
 message CommitSyncCommand {

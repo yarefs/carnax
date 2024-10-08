@@ -110,7 +110,7 @@ var DefaultCarnaxConfig = ParseFromProperties(Properties{
 	//raftMaxPool: 3,
 })
 
-// CarnaxController
+// CarnaxController ...
 type CarnaxController struct {
 	// raft consensus related bits
 	RaftBind string
@@ -123,7 +123,7 @@ type CarnaxController struct {
 	config CarnaxConfig
 
 	// @local
-	segmentCache map[TopicPartitionHash]*SegmentCache
+	segmentCache map[*TopicPartitionHash]*SegmentCache
 
 	// output
 	storeBackedLog ObjectStore // @leader only!
@@ -134,7 +134,7 @@ type CarnaxController struct {
 func NewCarnaxControllerWithConfig(store ObjectStore, config CarnaxConfig) *CarnaxController {
 	return &CarnaxController{
 		storeBackedLog: store,
-		segmentCache:   map[TopicPartitionHash]*SegmentCache{},
+		segmentCache:   map[*TopicPartitionHash]*SegmentCache{},
 		state: &sharedMessageLogState{
 			segment:                  NewSegmentLog(),
 			topicConfig:              make(map[string]*apiv1.TopicConfig),
@@ -150,7 +150,7 @@ func (m *CarnaxController) Start(raftInst *raft.Raft) error {
 	m.raft = raftInst
 
 	// NOTE: we are _expecting_ election here
-	// so we wait until we are marked as a leader.
+	// we wait until we are marked as a leader.
 	if m.config.ExecutionMode == SingleNode {
 		start := time.Now()
 		for {
@@ -163,6 +163,8 @@ func (m *CarnaxController) Start(raftInst *raft.Raft) error {
 				break
 			}
 		}
+	} else if m.config.ExecutionMode == MultiNode {
+		panic("not yet supported")
 	} else {
 		panic("not yet supported")
 	}
@@ -343,7 +345,7 @@ func (m *CarnaxController) read(topic string, partitionIndex uint32, offset uint
 //
 // nit: we should respect the state of the consumer group node here
 // e.g. if it's in a rebalance or not.
-func (m *CarnaxController) Poll(consumerGroupId string, clientId string, duration time.Duration) (*controllerv1.Poll_Response, error) {
+func (m *CarnaxController) Poll(consumerGroupId string, clientId string, _ time.Duration) (*controllerv1.Poll_Response, error) {
 	if m.getRaft().State() != raft.Leader {
 		return nil, ErrNotALeader
 	}
@@ -380,7 +382,7 @@ func (m *CarnaxController) Poll(consumerGroupId string, clientId string, duratio
 			continue
 		}
 
-		writtenBytes := calcRecordLen(rec, offset.Address.Offset)
+		writtenBytes := calcRecordLen(rec)
 
 		// NOTE: we can't necessarily foresee when we are in another segment at this point
 		nextOffset := offset.Address.Offset + writtenBytes + SegmentIncrement
@@ -404,7 +406,7 @@ func (m *CarnaxController) Poll(consumerGroupId string, clientId string, duratio
 	}, nil
 }
 
-func calcRecordLen(rec *apiv1.Record, offs uint64) uint64 {
+func calcRecordLen(rec *apiv1.Record) uint64 {
 	buf := new(bytes.Buffer)
 	amt, err := protodelim.MarshalTo(buf, rec)
 	if err != nil {
@@ -567,7 +569,7 @@ func (m *CarnaxController) Write(topic string, record *apiv1.Record) (*commandv1
 	panic("failed to get write result")
 }
 
-func (m *CarnaxController) softCommit(id string, clientId string, index uint32, delta uint64) error {
+func (m *CarnaxController) softCommit(id string, clientId string, index uint32, offset uint64) error {
 	if m.getRaft().State() != raft.Leader {
 		return ErrNotALeader
 	}
@@ -579,7 +581,7 @@ func (m *CarnaxController) softCommit(id string, clientId string, index uint32, 
 				ConsumerGroupId: id,
 				ClientId:        clientId,
 				PartitionIndex:  index,
-				NextOffsetDelta: delta,
+				Offset:          offset,
 			},
 		},
 	})
@@ -594,4 +596,18 @@ func (m *CarnaxController) softCommit(id string, clientId string, index uint32, 
 
 	res.Response()
 	return nil
+}
+
+// OffsetsForTimes ...
+// default.api.timeout.ms
+func (m *CarnaxController) OffsetsForTimes(id string, clientId string, m2 map[*TopicPartitionHash]*apiv1.SeekIndex) {
+	// todo: shift into apply...
+
+	for tph, seekIndex := range m2 {
+		// for given partition do index seeks by timestamp to an offset.
+		log.Println(tph.String(), "to", seekIndex)
+
+		// soft commit
+		//m.softCommit(id, clientId, 0, 0)
+	}
 }

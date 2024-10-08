@@ -558,4 +558,17 @@ func (c *carnaxTestSuite) TestIndexByTimestampToOffset() {
 	// seek to offset by timestamp
 	// poll message
 	// done
+
+	cg, err := c.controller.Subscribe("group", "id", "some_topic")
+	assert.NoError(c.T(), err)
+
+	c.controller.OffsetsForTimes(cg.ConsumerGroupId, cg.ClientId, map[*TopicPartitionHash]*apiv1.SeekIndex{
+		newTopicHash("some_topic", 0): {
+			Whence: &apiv1.SeekIndex_Time{
+				Time: startTime.Add(2 * day).UnixMilli(),
+			},
+		},
+	})
+
+	c.controller.Poll(cg.ConsumerGroupId, cg.ClientId, 15*time.Second)
 }
