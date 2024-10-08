@@ -278,8 +278,6 @@ func (c *carnaxTestSuite) TestMessageLog_Subscribe_TriggersPartitionAssignment_M
 
 	c.controller.Poll("my_consumer_group", "client-1", time.Second*10)
 
-	// TODO(FELIX): Describe the consumer group
-
 	minRaftPropagationSleep()
 }
 
@@ -458,7 +456,7 @@ func (c *carnaxTestSuite) TestSharedMessageLog_SinglePartition_MultipleSegment_S
 	err = c.controller.CommitSync(cgn.ConsumerGroupId)
 	assert.NoError(c.T(), err)
 
-	// read and verify. TODO(FELIX): Adjust config to only poll 1 record at a time.
+	// read and verify
 	poll, _ := c.controller.Poll(cgn.ConsumerGroupId, cgn.ClientId, 15*time.Second)
 	assert.Len(c.T(), poll.Records, 1)
 	assert.Equal(c.T(), "angell", string(poll.Records[0].Payload))

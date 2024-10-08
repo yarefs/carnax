@@ -338,7 +338,8 @@ func (m *CarnaxController) read(topic string, partitionIndex uint32, offset uint
 }
 
 // Poll ...
-// FIXME(FELIX): This signature is somewhat inconsistent in how it returns information
+//
+// This signature is inconsistent in how it returns information
 // as opposed to the rest of the API
 //
 // nit: we should respect the state of the consumer group node here
@@ -371,10 +372,8 @@ func (m *CarnaxController) Poll(consumerGroupId string, clientId string, duratio
 		panic("invalid state")
 	}
 
-	// NIT(FELIX): Should we return this keyed?
 	var out []*apiv1.Record
 
-	// TODO(FELIX): We can parallelize this.
 	for topic, offset := range v.OffsetsToFetch {
 		rec, err := m.read(topic, offset.Address.PartitionIndex, offset.Address.Offset, offset.Point)
 		if err != nil {
@@ -396,6 +395,7 @@ func (m *CarnaxController) Poll(consumerGroupId string, clientId string, duratio
 			panic(err)
 		}
 
+		// NIT just use a channel instead
 		out = append(out, rec)
 	}
 
@@ -405,10 +405,6 @@ func (m *CarnaxController) Poll(consumerGroupId string, clientId string, duratio
 	}, nil
 }
 
-/*
-*
-FIXME(FELIX): This is a big symptom of something going a bit wrong with the design.
-*/
 func calcRecordLen(rec *apiv1.Record, offs uint64) uint64 {
 	recordWithOffs := &apiv1.RecordWithOffset{
 		Record: rec,

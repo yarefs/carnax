@@ -11,5 +11,4 @@ RUN go get ./...
 
 RUN make broker
 
-# TODO take this as an arg
 CMD [ "/app/carnax-broker", "--raft_bootstrap", "--raft_id=nodeA" ]

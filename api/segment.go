@@ -182,8 +182,8 @@ func NewTopicPartitionSegment(config CarnaxConfig, start ...uint64) *TopicPartit
 		low:  ^uint64(0),
 		high: 0,
 
-		// FIXME(FELIX): we should only link to the topic partition related
-		// config here...
+		// NOTE: Ideally we should only link to the topic partition related
+		// config here but for now we take the whole thing
 		config: config,
 	}
 
@@ -286,7 +286,8 @@ func (s *SegmentCache) findNearest(offs uint64) *cachedSegment {
 }
 
 func (s *SegmentCache) cacheSeg(offs uint64, reader []byte) {
-	// TODO(FELIX): measure this. and document it.
+	// NOTE: this is an attempt at a strategy to keep the cached
+	// segments low and should be properly verified.
 	if len(s.cache) > 0 {
 		if offs < s.cache[len(s.cache)-1].offset {
 			s.cache = []*cachedSegment{}

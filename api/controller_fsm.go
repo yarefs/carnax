@@ -283,22 +283,15 @@ func (f *CarnaxControllerFSM) assignPartition(topic string, key []byte, numParti
 	return partition
 }
 
-/*
-*
-FIXME(FELIX):
-this should likely not read from a specific offset per se,
-but rather binary search to find the place to read from and tolerate failures, i.e.
-EOF properly so that we can continue to the next segment if necessary.
-*/
 func (f *CarnaxControllerFSM) applyReadMessage(topic string, address *commandv1.Address, point commandv1.ResetPoint) interface{} {
 	f.lsMu.Lock()
 	defer f.lsMu.Unlock()
 
+	// NOTE: This is temporary until reads are re-designed
 	return f.tryReadWithSegmentCacheHistory(topic, address, point)
 }
 
 func (f *CarnaxControllerFSM) tryReadWithSegmentCacheHistory(topic string, address *commandv1.Address, point commandv1.ResetPoint) interface{} {
-
 	hash := tpHash(topic, address.PartitionIndex)
 
 	log.Println("READ:", internal.FormatAddr(address), "RP:", point, hash)
@@ -361,10 +354,6 @@ func (f *CarnaxControllerFSM) tryReadWithSegmentCacheHistory(topic string, addre
 	// return the offset->bytepos in that segment
 	// and that is what is a cache hit vs miss.
 
-	// NIT(FELIX): We should be able to specify how many times we want to consume
-	// at this point.
-	// Investigate caching this segment as well.
-	// max.poll.records (500 default)
 	f.cacheSegment(topic, address, logSegmentFileData) // SLICE?
 
 	return &commandv1.ReadMessageCommand_Response{
@@ -376,8 +365,6 @@ func (f *CarnaxControllerFSM) tryReadWithSegmentCacheHistory(topic string, addre
 func (f *CarnaxControllerFSM) applySubscribeTopic(consumerGroupId string, topics []string, clientId string) interface{} {
 	f.cgMu.Lock()
 	defer f.cgMu.Unlock()
-
-	// TODO(FELIX): Should we split this conditional logic into two.
 
 	log.Println("Subscribe", consumerGroupId, topics, clientId)
 
@@ -404,8 +391,6 @@ func (f *CarnaxControllerFSM) applySubscribeTopic(consumerGroupId string, topics
 		}
 		f.state.consumerGroupDescriptors[consumerGroupId] = cgd
 	} else {
-		// TODO(FELIX): Failure case if we have already got the client consumerGroupId registered.
-
 		// NOTE: We are triggering a subscription therefore the active generation consumerGroupId increments
 		cgd.ActiveGenerationId += 1
 		newGenerationId := cgd.ActiveGenerationId
@@ -430,14 +415,12 @@ func (f *CarnaxControllerFSM) applySubscribeTopic(consumerGroupId string, topics
 	return f.state.consumerGroupDescriptors[consumerGroupId].RegisteredClients[clientId]
 }
 
-// FIXME(FELIX): after this, we must propagate new assigned partitions to clients.
 func (f *CarnaxControllerFSM) applyRebalancePartitions(id string) interface{} {
 	f.cgMu.Lock()
 	defer f.cgMu.Unlock()
 
 	// given a state of the world, i.e. what consumers are available
 	// we should be able to see all available partitions and re-assign evenly.
-	// TODO(FELIX):
 
 	cgNode, ok := f.state.consumerGroupDescriptors[id]
 	if !ok {
@@ -517,8 +500,7 @@ func (f *CarnaxControllerFSM) applyPollMessages(clientId string, consumerGroupId
 	for _, tp := range node.AssignedPartitions {
 		resetPoint := commandv1.ResetPoint_RESET_POINT_EXACT
 
-		// NIT current is more like the last offset.
-		// read from each assigned partition at the given offset.
+		// NOTE: current is a misnomer. It is the last seen offset
 		lastCommittedOffset, ok := node.CurrentOffset[tp.PartitionIndex]
 		if !ok {
 			// we haven't read the stream yet.

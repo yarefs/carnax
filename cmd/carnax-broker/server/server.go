@@ -22,9 +22,6 @@ type CarnaxControllerServer struct {
 }
 
 func (c CarnaxControllerServer) BatchPublish(ctx context.Context, request *controllerv1.BatchPublishRequest) (*controllerv1.BatchPublishResponse, error) {
-	// FIXME(FELIX): Ensure we can guarnatee ordering
-	// on a partition level
-
 	var wg sync.WaitGroup
 	for _, req := range request.Requests {
 		wg.Add(1)
