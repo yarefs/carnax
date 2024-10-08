@@ -15,7 +15,7 @@ jobs:
     name: Build and test
     runs-on: ubuntu-latest
     env:
-      - SILENCE_LOGS: "1"
+      SILENCE_LOGS: "1"
     steps:
     - uses: actions/checkout@v4
     
