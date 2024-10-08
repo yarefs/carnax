@@ -32,4 +32,6 @@ jobs:
       run: go build -v ./...
 
     - name: Test
+      environment:
+        - SILENCE_LOGS: "1"
       run: go test -v ./...

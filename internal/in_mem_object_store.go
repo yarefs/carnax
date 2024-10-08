@@ -16,6 +16,8 @@ type InMemoryObjectStore struct {
 
 	mu   sync.Mutex
 	keys []string
+
+	verboseLogging bool
 }
 
 func (i *InMemoryObjectStore) List(s string) []string {
@@ -29,14 +31,22 @@ func (i *InMemoryObjectStore) List(s string) []string {
 }
 
 func NewInMemoryObjectStore() *InMemoryObjectStore {
-	return &InMemoryObjectStore{d: sync.Map{}}
+	verboseLogging := true
+
+	if ShouldHave("SILENCE_LOGS") == "1" {
+		verboseLogging = false
+	}
+
+	return &InMemoryObjectStore{d: sync.Map{}, verboseLogging: verboseLogging}
 }
 
 func (i *InMemoryObjectStore) Put(s string, bytes []byte) error {
 	i.mu.Lock()
 	defer i.mu.Unlock()
 
-	log.Println("PUT:", s, len(bytes))
+	if i.verboseLogging {
+		log.Println("PUT:", s, len(bytes))
+	}
 
 	// discard duplicate keys.
 	if idx := slices.Index(i.keys, s); idx == -1 {
