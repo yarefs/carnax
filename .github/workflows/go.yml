@@ -14,6 +14,8 @@ jobs:
   build_and_test:
     name: Build and test
     runs-on: ubuntu-latest
+    environment:
+      - SILENCE_LOGS: "1"
     steps:
     - uses: actions/checkout@v4
     
@@ -32,6 +34,4 @@ jobs:
       run: go build -v ./...
 
     - name: Test
-      environment:
-        - SILENCE_LOGS: "1"
       run: go test -v ./...
