@@ -464,6 +464,67 @@ func (c *carnaxTestSuite) TestSharedMessageLog_SinglePartition_MultipleSegment_S
 	assert.Equal(c.T(), "angell", string(poll.Records[0].Payload))
 }
 
+func (c *carnaxTestSuite) TestSharedMessageLog_SinglePartition_MultipleSegment_SequentialReads_IrregularSegmentStrides() {
+	err := c.controller.CreateTopic(&apiv1.TopicConfig{
+		Name:           "some_topic",
+		PartitionCount: 1,
+	})
+	assert.NoError(c.T(), err)
+
+	// FIRST SEGMENT/WRITE
+	_, err = c.controller.Write("some_topic", &apiv1.Record{
+		Key:     nil,
+		Payload: []byte("felix"),
+	})
+	assert.NoError(c.T(), err)
+
+	// FIRST SEGMENT/SECOND WRITE.
+	_, err = c.controller.Write("some_topic", &apiv1.Record{
+		Key:     nil,
+		Payload: []byte("loves"),
+	})
+	assert.NoError(c.T(), err)
+
+	err = c.controller.Flush()
+	assert.NoError(c.T(), err)
+
+	// SECOND SEGMENT/WRITE
+	_, err = c.controller.Write("some_topic", &apiv1.Record{
+		Key:     nil,
+		Payload: []byte("carnax"),
+	})
+	assert.NoError(c.T(), err)
+
+	err = c.controller.Flush()
+	assert.NoError(c.T(), err)
+
+	// leaves time for log applies.
+	minRaftPropagationSleep()
+
+	cgn, err := c.controller.Subscribe("some_id", "my-client", "some_topic")
+	assert.NoError(c.T(), err)
+
+	// read (discard)
+	firstPoll, _ := c.controller.Poll(cgn.ConsumerGroupId, cgn.ClientId, 15*time.Second)
+	assert.Len(c.T(), firstPoll.Records, 1)
+
+	// commit the offset we read
+	err = c.controller.CommitSync(cgn.ConsumerGroupId)
+	assert.NoError(c.T(), err)
+
+	// TODO(FELIX): Adjust config to only poll 1 record at a time.
+
+	// read and verify
+	poll, _ := c.controller.Poll(cgn.ConsumerGroupId, cgn.ClientId, 15*time.Second)
+	assert.Len(c.T(), poll.Records, 1)
+	assert.Equal(c.T(), "loves", string(poll.Records[0].Payload))
+
+	// read and verify
+	poll, _ = c.controller.Poll(cgn.ConsumerGroupId, cgn.ClientId, 15*time.Second)
+	assert.Len(c.T(), poll.Records, 1)
+	assert.Equal(c.T(), "carnax", string(poll.Records[0].Payload))
+}
+
 func (c *carnaxTestSuite) TestSharedMessageLog_SinglePartition_SequentialReads_CachedSegment() {
 	err := c.controller.CreateTopic(&apiv1.TopicConfig{
 		Name:           "some_topic",
