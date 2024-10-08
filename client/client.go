@@ -99,6 +99,7 @@ func (c *CarnaxPublisher) sendBatch(send []*controllerv1.PublishRequest) {
 		Requests: send,
 	})
 	if err != nil {
+		// re-try?
 		panic(err)
 	}
 }

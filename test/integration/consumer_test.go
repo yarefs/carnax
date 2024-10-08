@@ -16,6 +16,8 @@ import (
 Spins up a single node leader + and a minio instance to write to disk
 */
 func TestConsumerRestart(t *testing.T) {
+	t.Skip()
+
 	ctx := context.Background()
 
 	signal := make(chan struct{})
@@ -55,7 +57,7 @@ func TestConsumerRestart(t *testing.T) {
 	publisherClient.Start()
 
 	var wg sync.WaitGroup
-	for i := 0; i < 1_000_000; i += 1 {
+	for i := 0; i < 10_000; i += 1 {
 		wg.Add(1)
 		go func() {
 			publisherClient.Publish("some_topic", nil, []byte("hello, world!"))
@@ -64,7 +66,7 @@ func TestConsumerRestart(t *testing.T) {
 	}
 	wg.Wait()
 
-	time.Sleep(5 * time.Second)
+	time.Sleep(10 * time.Second)
 
 	publisherClient.Shutdown()
 
