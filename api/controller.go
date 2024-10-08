@@ -37,24 +37,23 @@ type sharedMessageLogState struct {
 }
 
 type CarnaxConfig struct {
-	LogSegmentBytes int
-
 	raftTimeout time.Duration
 	raftMaxPool int
 
-	ExecutionMode ExecutionMode
+	BootstrapServers []string
+	ExecutionMode    ExecutionMode
 
-	// max.poll.records
 	MaxPollRecords int
 
-	//log.index.interval.bytes
+	SegmentIndexBytes int
+	SegmentJitterMs   int
+	SegmentMs         int
 
-	SegmentIndexBytes  int
-	SegmentJitterMs    int
-	SegmentMs          int
-	MaxMessageBytes    int
-	IndexIntervalBytes int
-	BootstrapServers   []string
+	MaxMessageBytes int
+
+	IndexIntervalBytes    int
+	LogIndexIntervalBytes int
+	LogSegmentBytes       int
 }
 
 type Properties map[string]any
@@ -80,9 +79,9 @@ func ParseFromProperties(props Properties) CarnaxConfig {
 		BootstrapServers: strings.Split(props.string("bootstrap.servers"), ","),
 
 		// ADJUST!
-		LogSegmentBytes: props.int("log.segment.bytes", 0),
-
-		IndexIntervalBytes: props.int("index.interval.bytes", 4*KiB),
+		LogSegmentBytes:       props.int("log.segment.bytes", 0),
+		LogIndexIntervalBytes: props.int("log.index.interval.bytes", 4096),
+		IndexIntervalBytes:    props.int("index.interval.bytes", 4*KiB),
 
 		MaxPollRecords:  props.int("max.poll.records", 500),
 		MaxMessageBytes: props.int("max.message.bytes", 1*MiB),

@@ -27,21 +27,24 @@ type TopicPartitionSegment struct {
 
 	// watermark of this segment
 	low, high uint64
+
+	bytesSinceLastIndexWrite uint64
+	config                   CarnaxConfig
 }
 
 func (s *TopicPartitionSegment) Append(payload *apiv1.Record, offset uint64) {
-	// log.index.interval.bytes
-	// dictates roughly how many bytes of writes leads to a log entry.
-
 	// specify watermark for this topic
 	if offset < s.low {
 		s.low = offset
 	}
 
-	s.index = append(s.index, Index{
-		Offset:   offset,
-		Position: s.len,
-	})
+	if s.shouldWriteIndex() {
+		s.index = append(s.index, Index{
+			Offset:   offset,
+			Position: s.len,
+		})
+		s.bytesSinceLastIndexWrite = 0
+	}
 
 	recordWithOffs := &apiv1.RecordWithOffset{
 		Record: payload,
@@ -67,18 +70,23 @@ func (s *TopicPartitionSegment) Append(payload *apiv1.Record, offset uint64) {
 	}
 
 	s.len += uint64(amt)
+	s.bytesSinceLastIndexWrite += uint64(amt)
 }
 
 type IndexFile []Index
 
 func (i IndexFile) Search(offs uint64) Index {
+	if len(i) == 0 {
+		return Index{offs, 0}
+	}
+
 	log.Println("IndexFile Search:", offs, "Index Dump:")
 	for _, idx := range i {
 		log.Println(idx.Offset, "->", idx.Position)
 	}
 
 	left, right := 0, len(i)-1
-	best := -1
+	best := 0
 
 	for left <= right {
 		mid := left + ((right - left) / 2)
@@ -156,7 +164,11 @@ func (s *TopicPartitionSegment) Data() []byte {
 	return s.datas.Bytes()
 }
 
-func NewTopicPartitionSegment(start ...uint64) *TopicPartitionSegment {
+func (s *TopicPartitionSegment) shouldWriteIndex() bool {
+	return s.bytesSinceLastIndexWrite > uint64(s.config.LogIndexIntervalBytes)
+}
+
+func NewTopicPartitionSegment(config CarnaxConfig, start ...uint64) *TopicPartitionSegment {
 	/*
 		Experiment idea: pre-allocating segments of X size, e.g. 8mb or 4mb
 		right now this buffer is re-sized as we go.
@@ -169,6 +181,10 @@ func NewTopicPartitionSegment(start ...uint64) *TopicPartitionSegment {
 		// so writes after nullify to the real range.
 		low:  ^uint64(0),
 		high: 0,
+
+		// FIXME(FELIX): we should only link to the topic partition related
+		// config here...
+		config: config,
 	}
 
 	if len(start) == 1 {
@@ -207,7 +223,7 @@ func NewTopicSegment(prev ...*TopicSegment) *TopicSegment {
 	if len(prev) == 1 {
 		previous := prev[0]
 		for i, p := range previous.activeSegments {
-			res.activeSegments[i] = NewTopicPartitionSegment(p.high + SegmentIncrement)
+			res.activeSegments[i] = NewTopicPartitionSegment(p.config, p.high+SegmentIncrement)
 		}
 	}
 

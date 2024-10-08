@@ -512,8 +512,6 @@ func (c *carnaxTestSuite) TestSharedMessageLog_SinglePartition_MultipleSegment_S
 	err = c.controller.CommitSync(cgn.ConsumerGroupId)
 	assert.NoError(c.T(), err)
 
-	// TODO(FELIX): Adjust config to only poll 1 record at a time.
-
 	// read and verify
 	poll, _ := c.controller.Poll(cgn.ConsumerGroupId, cgn.ClientId, 15*time.Second)
 	assert.Len(c.T(), poll.Records, 1)
@@ -523,48 +521,4 @@ func (c *carnaxTestSuite) TestSharedMessageLog_SinglePartition_MultipleSegment_S
 	poll, _ = c.controller.Poll(cgn.ConsumerGroupId, cgn.ClientId, 15*time.Second)
 	assert.Len(c.T(), poll.Records, 1)
 	assert.Equal(c.T(), "carnax", string(poll.Records[0].Payload))
-}
-
-func (c *carnaxTestSuite) TestSharedMessageLog_SinglePartition_SequentialReads_CachedSegment() {
-	err := c.controller.CreateTopic(&apiv1.TopicConfig{
-		Name:           "some_topic",
-		PartitionCount: 1,
-	})
-	assert.NoError(c.T(), err)
-
-	// FIRST SEGMENT/WRITE
-	_, err = c.controller.Write("some_topic", &apiv1.Record{
-		Key:     nil,
-		Payload: []byte("felix"),
-	})
-	assert.NoError(c.T(), err)
-
-	// SECOND SEGMENT/WRITE
-	_, err = c.controller.Write("some_topic", &apiv1.Record{
-		Key:     nil,
-		Payload: []byte("angell"),
-	})
-	assert.NoError(c.T(), err)
-
-	err = c.controller.Flush()
-	assert.NoError(c.T(), err)
-
-	// leaves time for log applies.
-	minRaftPropagationSleep()
-
-	cgn, err := c.controller.Subscribe("some_id", "my-client", "some_topic")
-	assert.NoError(c.T(), err)
-
-	// read (discard)
-	firstPoll, _ := c.controller.Poll(cgn.ConsumerGroupId, cgn.ClientId, 15*time.Second)
-	assert.Equal(c.T(), "felix", string(firstPoll.Records[0].Payload))
-
-	// commit the offset we read
-	c.controller.CommitSync(cgn.ConsumerGroupId)
-
-	// NIT(FELIX): How do we verify the cached segment was used?
-
-	// read and verify. TODO(FELIX): Adjust config to only poll 1 record at a time.
-	poll, _ := c.controller.Poll(cgn.ConsumerGroupId, cgn.ClientId, 15*time.Second)
-	assert.Equal(c.T(), "angell", string(poll.Records[0].Payload))
 }

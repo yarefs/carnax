@@ -138,7 +138,7 @@ func (f *CarnaxControllerFSM) applyReserveAddress(topic string, key []byte) inte
 
 	assignedPartitionLog, ok := tps.activeSegments[partIndex]
 	if !ok {
-		assignedPartitionLog = NewTopicPartitionSegment()
+		assignedPartitionLog = NewTopicPartitionSegment(f.config)
 		tps.activeSegments[partIndex] = assignedPartitionLog
 	}
 
@@ -172,7 +172,7 @@ func (f *CarnaxControllerFSM) applyWrite(topic string, rec *apiv1.Record, addres
 
 	// first initialisation of this segment
 	if _, ok := segment.activeSegments[address.PartitionIndex]; !ok {
-		segment.activeSegments[address.PartitionIndex] = NewTopicPartitionSegment()
+		segment.activeSegments[address.PartitionIndex] = NewTopicPartitionSegment(f.config)
 	}
 
 	offset := address.Offset
