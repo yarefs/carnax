@@ -1,0 +1,38 @@
+syntax = "proto3";
+
+package controller.v1;
+
+import "api/v1/record.proto";
+import "api/v1/consumer.proto";
+import "api/v1/config.proto";
+
+message Poll {
+  message Response {
+    repeated api.v1.Record records = 1;
+    api.v1.ConsumerGroupNode metadata = 2;
+  }
+}
+
+message CreateTopicRequest {
+  api.v1.TopicConfig config = 1;
+}
+
+message CreateTopicResponse {
+
+}
+
+message PublishRequest {
+  string topic = 1;
+  bytes key = 2;
+  bytes value = 3;
+}
+
+message PublishResponse {
+  bool ok = 1;
+}
+
+service CarnaxService {
+  rpc CreateTopic(CreateTopicRequest) returns (CreateTopicResponse);
+
+  rpc Publish(PublishRequest) returns (PublishResponse);
+}

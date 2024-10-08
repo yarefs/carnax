@@ -1,0 +1,47 @@
+syntax = "proto3";
+package api.v1;
+
+// ConsumerGroupDescriptor
+message ConsumerGroupDescriptor {
+  string id = 1;
+
+  repeated string topics = 2;
+
+  uint64 active_generation_id = 3;
+
+  // client.id -> node
+  map<string, ConsumerGroupNode> registered_clients = 4;
+}
+
+enum ConsumerGroupState {
+  CONSUMER_GROUP_STATE_UNSPECIFIED = 0;
+  CONSUMER_GROUP_STATE_PREPARING_REBALANCE = 1;
+  CONSUMER_GROUP_STATE_COMPLETING_REBALANCE = 2;
+  CONSUMER_GROUP_STATE_STABLE = 3;
+  CONSUMER_GROUP_STATE_DEAD = 4;
+  CONSUMER_GROUP_STATE_EMPTY = 5;
+}
+
+message TopicPartition {
+  string topic = 1;
+  uint32 partition_index = 2;
+}
+
+// ConsumerGroupNode
+message ConsumerGroupNode {
+  string consumer_group_id = 1;
+
+  repeated TopicPartition assigned_partitions = 2;
+
+  uint64 active_generation_id = 3;
+
+  ConsumerGroupState state = 4;
+
+  // equivalent to kafka's client.id
+  // that uniquely identifies the node in a consumer group
+  string client_id = 5;
+
+  map<uint32, uint64> committed_offset = 6;
+
+  map<uint32, uint64> current_offset = 7;
+}

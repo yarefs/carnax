@@ -1,0 +1,154 @@
+syntax = "proto3";
+package command.v1;
+
+import "api/v1/record.proto";
+import "api/v1/config.proto";
+import "api/v1/consumer.proto";
+
+enum CommandType {
+  COMMAND_TYPE_UNSPECIFIED = 0;
+  COMMAND_TYPE_CREATE_TOPIC = 1;
+  COMMAND_TYPE_RESERVE_ADDRESS = 2;
+  COMMAND_TYPE_WRITE_MESSAGE = 3;
+  COMMAND_TYPE_FLUSH_SEGMENT = 4;
+  COMMAND_TYPE_READ_MESSAGE = 5;
+  COMMAND_TYPE_SUBSCRIBE_TOPIC = 6;
+  COMMAND_TYPE_ASSIGN_PARTITIONS = 7;
+  COMMAND_TYPE_REBALANCE_PARTITIONS = 8;
+  COMMAND_TYPE_POLL_MESSAGES = 9;
+  COMMAND_TYPE_COMMIT_SYNC = 10;
+  // ASYNC
+  COMMAND_TYPE_SOFT_COMMIT = 11;
+}
+
+// an address is the offset AND partition index
+message Address {
+  uint64 offset = 1;
+  uint32 partition_index = 2;
+}
+
+enum ResetPoint {
+  RESET_POINT_UNSPECIFIED = 0;
+  RESET_POINT_EXACT = 1;
+  RESET_POINT_EARLIEST = 2;
+
+  // is this necessary yet?
+  RESET_POINT_LATEST = 3;
+}
+
+message OffsetResetPoint {
+  Address address = 1;
+  ResetPoint point = 2;
+}
+
+message Command {
+  CommandType type = 1;
+
+  oneof command {
+    CreateTopicCommand create_topic = 2;
+    ReserveAddressCommand reserve_address = 3;
+
+    WriteMessageCommand write_message = 4;
+    FlushSegmentCommand flush_segment = 5;
+    ReadMessageCommand read_message = 6;
+
+    SubscribeTopicCommand subscribe_topic = 7;
+    AssignPartitionsCommand assign_partitions = 8;
+    RebalancePartitionsCommand rebalance_partitions = 9;
+
+    PollMessagesCommand poll_messages = 10;
+    CommitSyncCommand commit_sync = 11;
+    SoftCommitCommand soft_commit = 12;
+  }
+}
+
+message CreateTopicCommand {
+  api.v1.TopicConfig config = 1;
+}
+
+message ReserveAddressCommand {
+  string topic = 1;
+  bytes key = 2;
+
+  message Response {
+    Address address = 1;
+  }
+}
+
+message WriteMessageCommand {
+  string topic = 1;
+  api.v1.Record record = 2;
+  Address address = 3;
+
+  message Response {
+    Address address = 1;
+  }
+}
+
+message FlushSegmentCommand {}
+
+message ReadMessageCommand {
+  //  topic string, partitionIndex uint32, offset uint64;
+  string topic = 1;
+  Address address = 2;
+  ResetPoint reset_point = 3;
+
+  message Response {
+    api.v1.Record record = 1;
+  }
+}
+
+// SubscribeTopicCommand is to join a consumer group
+// and subscribe to the given topics.
+// Registering to join a consumer group leads to a rebalance
+// which will result in a new 'generation' of a consumer group.
+//
+// TODO: heartbeats should be send to the group leader to handle kickouts.
+// register auto.offset.reset (earliest or latest).
+//
+// https://docs.confluent.io/platform/current/clients/consumer.html
+message SubscribeTopicCommand {
+  // kafka's group.id
+  string id = 1;
+
+  repeated string topic = 2;
+
+  // kafka's client.id
+  string client_id = 3;
+
+  message Response {
+    string id = 1;
+
+    // generation_id increases on every re-balance
+    uint64 generation_id = 2;
+  }
+}
+
+message AssignPartitionsCommand {
+  repeated uint32 partition_indices = 1;
+}
+
+message RebalancePartitionsCommand {
+  string consumer_group_id = 1;
+}
+
+message PollMessagesCommand {
+  string consumer_group_id = 1;
+  string client_id = 2; // should this be optional?
+
+  message Response {
+    map<string, OffsetResetPoint> offsets_to_fetch = 1;
+    api.v1.ConsumerGroupNode metadata = 2;
+  }
+}
+
+message SoftCommitCommand {
+  string consumer_group_id = 1;
+  string client_id = 2;
+  uint32 partition_index = 3;
+  uint64 next_offset_delta = 4;
+}
+
+message CommitSyncCommand {
+  string consumer_group_id = 1;
+}

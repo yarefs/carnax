@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package api.v1;
+
+message Record {
+  bytes key = 1;
+
+  bytes payload = 2;
+}
+
+message RecordWithOffset {
+  Record record = 1;
+  uint64 offset = 2;
+}
+
+message CommittedRecord {
+  RecordWithOffset record = 1;
+
+  // the record is hashed with crc-32
+  uint32 checksum = 2;
+}

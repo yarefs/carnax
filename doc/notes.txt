@@ -1,0 +1,40 @@
+in sync replicas
+
+what happens if out of sync
+
+write req -> load into segment -> batch -> write to s3 -> send ack to producer
+
+---
+
+read path:
+
+spin up a consumer
+subscribe to a topic
+
+if new consumer and consumers already exist:
+stop all consumers.
+re-assign consumers to topic-parts.
+(stop the world rebalance)
+
+eager vs incremental?
+
+---
+
+join a consumer group
+    we need to notify the consumer group of _our_ id/ip?
+    all nodes will then register this
+    triggers a rebalance?
+
+poll a consumer group
+    given a consumer local id?
+    only one node serves this request.
+    check consumer group contains requesting consumer
+        see what stuff it's assigned to
+        batch some messages and respond them if available
+
+assign a partition -- leader performs this
+    i am a consumer with this id
+    leader
+        notify all other consumers to stop (how?)
+        assign partitions to all known consumers
+        notify all consumers to pick up there respective partitions

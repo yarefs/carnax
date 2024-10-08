@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package api.v1;
+
+/*
+  Home to all of the configurations available in Carnax.
+ */
+
+message TopicConfig {
+  string name = 1;
+  uint32 partition_count = 2;
+}
+
+message CarnaxConfig {
+  
+}
