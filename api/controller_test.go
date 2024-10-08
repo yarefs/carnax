@@ -121,17 +121,17 @@ func (c *carnaxTestSuite) TestSharedMessageLog_Write_SinglePartition_OrderedFlus
 	data, _ := c.store.Get("some_topic-0/00000000000000000000.log")
 	buf := bytes.NewBuffer(data)
 
-	var rec apiv1.CommittedRecord
+	var rec apiv1.Record
 	err = protodelim.UnmarshalFrom(buf, &rec)
 	assert.NoError(c.T(), err)
 
-	assert.Equal(c.T(), "felix", string(rec.Record.Record.Payload))
+	assert.Equal(c.T(), "felix", string(rec.Payload))
 
-	var nextRec apiv1.CommittedRecord
+	var nextRec apiv1.Record
 	err = protodelim.UnmarshalFrom(buf, &nextRec)
 	assert.NoError(c.T(), err)
 
-	assert.Equal(c.T(), "angell", string(nextRec.Record.Record.Payload))
+	assert.Equal(c.T(), "angell", string(nextRec.Payload))
 
 }
 
@@ -168,18 +168,18 @@ func (c *carnaxTestSuite) TestSharedMessageLog_Write_SinglePartition_MultiplePar
 	firstPartData, _ := c.store.Get("some_topic-0/00000000000000000000.log")
 	firstPartBuf := bytes.NewBuffer(firstPartData)
 
-	var first apiv1.CommittedRecord
+	var first apiv1.Record
 	err = protodelim.UnmarshalFrom(firstPartBuf, &first)
 	assert.NoError(c.T(), err)
-	assert.Equal(c.T(), "felix", string(first.Record.Record.Payload))
+	assert.Equal(c.T(), "felix", string(first.Payload))
 
 	secondPartData, _ := c.store.Get("some_topic-1/00000000000000000000.log")
 	secondPartBuf := bytes.NewBuffer(secondPartData)
 
-	var second apiv1.CommittedRecord
+	var second apiv1.Record
 	err = protodelim.UnmarshalFrom(secondPartBuf, &second)
 	assert.NoError(c.T(), err)
-	assert.Equal(c.T(), "angell", string(second.Record.Record.Payload))
+	assert.Equal(c.T(), "angell", string(second.Payload))
 }
 
 // ensure that we only have one active segment at a time.
@@ -519,4 +519,29 @@ func (c *carnaxTestSuite) TestSharedMessageLog_SinglePartition_MultipleSegment_S
 	poll, _ = c.controller.Poll(cgn.ConsumerGroupId, cgn.ClientId, 15*time.Second)
 	assert.Len(c.T(), poll.Records, 1)
 	assert.Equal(c.T(), "carnax", string(poll.Records[0].Payload))
+}
+
+func (c *carnaxTestSuite) TestIndexByTimestampToOffset() {
+	err := c.controller.CreateTopic(&apiv1.TopicConfig{
+		Name:           "some_topic",
+		PartitionCount: 1,
+	})
+	assert.NoError(c.T(), err)
+
+	// write a message with some metadata on the timestamp
+	_, err = c.controller.Write("some_topic", &apiv1.Record{
+		Key:     nil,
+		Payload: []byte("felix"),
+	})
+	assert.NoError(c.T(), err)
+
+	// FIRST SEGMENT/SECOND WRITE.
+	_, err = c.controller.Write("some_topic", &apiv1.Record{
+		Key:     nil,
+		Payload: []byte("loves"),
+	})
+	assert.NoError(c.T(), err)
+
+	err = c.controller.Flush()
+	assert.NoError(c.T(), err)
 }

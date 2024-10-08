@@ -6,16 +6,19 @@ message Record {
   bytes key = 1;
 
   bytes payload = 2;
-}
 
-message RecordWithOffset {
-  Record record = 1;
-  uint64 offset = 2;
-}
-
-message CommittedRecord {
-  RecordWithOffset record = 1;
+  RecordMetadata metadata = 3;
 
   // the record is hashed with crc-32
-  uint32 checksum = 2;
+  // nit: in kafka apparently record level
+  // checksum is replaced by batch-level checksum
+  uint32 checksum = 4;
+}
+
+message RecordMetadata {
+  uint32 timestamp = 1;
+  uint64 offset = 2;
+  uint64 relative_offset = 3;
+  int32 key_uncompressed_length = 4;
+  int32 value_uncompressed_length = 5;
 }

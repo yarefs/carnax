@@ -342,7 +342,7 @@ func (f *CarnaxControllerFSM) tryReadWithSegmentCacheHistory(topic string, addre
 
 	logSegmentDataReader := bytes.NewReader(logSegmentFileData[pos.Position:])
 
-	rec := &apiv1.CommittedRecord{}
+	rec := &apiv1.Record{}
 	err = protodelim.UnmarshalFrom(logSegmentDataReader, rec)
 	if err != nil {
 		panic(err)
@@ -357,7 +357,7 @@ func (f *CarnaxControllerFSM) tryReadWithSegmentCacheHistory(topic string, addre
 	f.cacheSegment(topic, address, logSegmentFileData) // SLICE?
 
 	return &commandv1.ReadMessageCommand_Response{
-		Record: rec.Record.Record,
+		Record: rec,
 	}
 }
 
@@ -545,7 +545,7 @@ func (f *CarnaxControllerFSM) applyCommitSync(id string) interface{} {
 	return nil
 }
 
-func (f *CarnaxControllerFSM) tryFindInCache(topic string, address *commandv1.Address) (*apiv1.CommittedRecord, bool) {
+func (f *CarnaxControllerFSM) tryFindInCache(topic string, address *commandv1.Address) (*apiv1.Record, bool) {
 	sc, ok := f.segmentCache[tpHash(topic, address.PartitionIndex)]
 	if !ok {
 		return nil, false
@@ -560,7 +560,7 @@ func (f *CarnaxControllerFSM) tryFindInCache(topic string, address *commandv1.Ad
 
 	log.Println("CACHED_SEG_LEN", len(seg.data))
 
-	res := &apiv1.CommittedRecord{}
+	res := &apiv1.Record{}
 
 	if err := protodelim.UnmarshalFrom(reader, res); err != nil {
 		// cache miss.
@@ -574,7 +574,12 @@ func (f *CarnaxControllerFSM) tryFindInCache(topic string, address *commandv1.Ad
 		return nil, false
 	}
 
-	return res, true
+	result := new(apiv1.Record)
+	if err := proto.Unmarshal(res.Payload, res); err != nil {
+		panic(err)
+	}
+
+	return result, true
 }
 
 func (f *CarnaxControllerFSM) cacheSegment(topic string, address *commandv1.Address, reader []byte) {

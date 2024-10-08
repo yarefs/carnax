@@ -46,31 +46,30 @@ func (s *TopicPartitionSegment) Append(payload *apiv1.Record, offset uint64) {
 		s.bytesSinceLastIndexWrite = 0
 	}
 
-	recordWithOffs := &apiv1.RecordWithOffset{
-		Record: payload,
-		Offset: offset,
-	}
-	recordWithOffsBytes, err := proto.Marshal(recordWithOffs)
+	recordWithOffsBytes, err := proto.Marshal(payload)
 	if err != nil {
 		panic("Failed to marshal record")
 	}
-	checksum := crc32.ChecksumIEEE(recordWithOffsBytes)
 
-	amt, err := protodelim.MarshalTo(s.datas, &apiv1.CommittedRecord{
-		Record:   recordWithOffs,
-		Checksum: checksum,
-	})
+	// defensive measure to ensure checksums are only set once.
+	if payload.Checksum != 0 {
+		panic("invalid state: checksum must not be set")
+	}
+
+	payload.Checksum = crc32.ChecksumIEEE(recordWithOffsBytes)
+
+	numBytesWritten, err := protodelim.MarshalTo(s.datas, payload)
 	if err != nil {
 		panic(err)
 	}
 
-	nextOffs := offset + uint64(amt)
+	nextOffs := offset + uint64(numBytesWritten)
 	if nextOffs > s.high {
 		s.high = nextOffs
 	}
 
-	s.len += uint64(amt)
-	s.bytesSinceLastIndexWrite += uint64(amt)
+	s.len += uint64(numBytesWritten)
+	s.bytesSinceLastIndexWrite += uint64(numBytesWritten)
 }
 
 type IndexFile []Index

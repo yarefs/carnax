@@ -9,7 +9,6 @@ import (
 	controllerv1 "github.com/yarefs/carnax/gen/controller/v1"
 	"google.golang.org/protobuf/encoding/protodelim"
 	"google.golang.org/protobuf/proto"
-	"hash/crc32"
 	"log"
 	"strings"
 	"sync"
@@ -406,23 +405,8 @@ func (m *CarnaxController) Poll(consumerGroupId string, clientId string, duratio
 }
 
 func calcRecordLen(rec *apiv1.Record, offs uint64) uint64 {
-	recordWithOffs := &apiv1.RecordWithOffset{
-		Record: rec,
-		Offset: offs,
-	}
-	recordWithOffsBytes, err := proto.Marshal(recordWithOffs)
-	if err != nil {
-		panic("Failed to marshal record")
-	}
-	checksum := crc32.ChecksumIEEE(recordWithOffsBytes)
-
-	writtenRec := &apiv1.CommittedRecord{
-		Record:   recordWithOffs,
-		Checksum: checksum,
-	}
-
 	buf := new(bytes.Buffer)
-	amt, err := protodelim.MarshalTo(buf, writtenRec)
+	amt, err := protodelim.MarshalTo(buf, rec)
 	if err != nil {
 		panic(err)
 	}
