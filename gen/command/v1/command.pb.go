@@ -749,9 +749,6 @@ func (x *ReadMessageCommand) GetResetPoint() ResetPoint {
 // Registering to join a consumer group leads to a rebalance
 // which will result in a new 'generation' of a consumer group.
 //
-// TODO: heartbeats should be send to the group leader to handle kickouts.
-// register auto.offset.reset (earliest or latest).
-//
 // https://docs.confluent.io/platform/current/clients/consumer.html
 type SubscribeTopicCommand struct {
 	state         protoimpl.MessageState
