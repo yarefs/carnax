@@ -7,12 +7,6 @@ import (
 	"strings"
 )
 
-type SegmentPath string
-
-func (s SegmentPath) Valid() bool {
-	return true
-}
-
 type SegmentLookupPred func(u uint64, ts int64) bool
 
 func SegmentByTimestamp(store ObjectStore, topic string, partition uint32) SegmentLookupPred {
