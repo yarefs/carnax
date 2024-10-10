@@ -13,7 +13,26 @@ func (s SegmentPath) Valid() bool {
 	return true
 }
 
-func findLowestSegmentWithNearbyTimestamp(paths []string, target int64, pred func(offs uint64, ts int64) bool) int {
+type SegmentLookupPred func(u uint64, ts int64) bool
+
+func SegmentByTimestamp(store ObjectStore, topic string, partition uint32) SegmentLookupPred {
+	return func(u uint64, ts int64) bool {
+		key := SegmentName(topic, partition, u).Format(SegmentTimeIndex)
+		data, err := store.Get(key)
+		if err != nil {
+			return false
+		}
+
+		index := TimeIndexFromBytes(data)
+		if len(index) == 0 {
+			panic("empty index")
+		}
+
+		return ts >= index[0].Timestamp
+	}
+}
+
+func findLowestSegmentWithNearbyTimestamp(paths []string, target int64, pred SegmentLookupPred) int {
 	sp := parseSegmentPaths(paths)
 
 	l, r := 0, len(sp)-1
@@ -21,7 +40,7 @@ func findLowestSegmentWithNearbyTimestamp(paths []string, target int64, pred fun
 
 	for l <= r {
 		mid := l + ((r - l) / 2)
-		if pred(sp[mid], int64(target)) {
+		if pred(sp[mid], target) {
 			l = mid + 1
 			best = mid
 		} else {

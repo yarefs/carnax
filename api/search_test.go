@@ -47,25 +47,9 @@ func Test_findOffsetByTimestamp(t *testing.T) {
 	}))
 	assert.NoError(t, err)
 
-	pred := func(u uint64, ts int64) bool {
-		key := SegmentName("orders", 0, u).Format(SegmentTimeIndex)
-		data, err := store.Get(key)
-		if err != nil {
-			return false
-		}
-
-		index := TimeIndexFromBytes(data)
-		if len(index) == 0 {
-			panic("empty index")
-		}
-
-		return ts >= index[0].Timestamp
-	}
-
+	pred := SegmentByTimestamp(store, "orders", 0)
 	timestamp := int64(0x10)
-
 	best := findLowestSegmentWithNearbyTimestamp(segmentsList, timestamp, pred)
-
 	assert.Equal(t, 1, best)
 }
 
