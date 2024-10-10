@@ -219,26 +219,20 @@ func (f *CarnaxControllerFSM) applyFlushSegment() interface{} {
 				seg := seg
 				partition := partition
 
-				// .log   		(records)
-				key := fmt.Sprintf("%s-%d/%020d.log", topicName, partition, seg.start)
-				//log.Println(curr.id, "PUT", key, len(seg.Data()))
-				err := f.storeBackedLog.Put(key, seg.Data())
+				logKey := SegmentName(topicName, partition, seg.start).Format(SegmentLogFile)
+				err := f.storeBackedLog.Put(logKey, seg.Data())
 				if err != nil {
 					panic(err)
 				}
 
-				// .index 		(offset to byte)
-				key = fmt.Sprintf("%s-%d/%020d.index", topicName, partition, seg.start)
-				//log.Println(curr.id, "PUT", key)
-
-				err = f.storeBackedLog.Put(key, seg.Index())
+				indexKey := SegmentName(topicName, partition, seg.start).Format(SegmentIndex)
+				err = f.storeBackedLog.Put(indexKey, seg.Index())
 				if err != nil {
 					panic(err)
 				}
 
-				// .timeindex	(timestamp to offs?)
-				key = fmt.Sprintf("%s-%d/%020d.timeindex", topicName, partition, seg.start)
-				err = f.storeBackedLog.Put(key, seg.TimeIndex())
+				timeIndexKey := SegmentName(topicName, partition, seg.start).Format(SegmentTimeIndex)
+				err = f.storeBackedLog.Put(timeIndexKey, seg.TimeIndex())
 				if err != nil {
 					panic(err)
 				}

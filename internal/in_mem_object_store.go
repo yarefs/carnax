@@ -61,7 +61,7 @@ func (i *InMemoryObjectStore) Put(s string, bytes []byte) error {
 func (i *InMemoryObjectStore) Get(s string) ([]byte, error) {
 	value, ok := i.d.Load(s)
 	if !ok {
-		return []byte{}, errors.New("not found")
+		return []byte{}, errors.New(s + " not found")
 	}
 	return value.([]byte), nil
 }

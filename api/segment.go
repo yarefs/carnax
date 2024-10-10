@@ -2,6 +2,7 @@ package api
 
 import (
 	"bytes"
+	"fmt"
 	"github.com/hashicorp/go-uuid"
 	apiv1 "github.com/yarefs/carnax/gen/api/v1"
 	"google.golang.org/protobuf/encoding/protodelim"
@@ -25,6 +26,33 @@ type TopicPartitionSegment struct {
 
 	bytesSinceLastIndexWrite uint64
 	config                   CarnaxConfig
+}
+
+type SegmentKey string
+
+func SegmentName(topic string, partitionIndex uint32, offset uint64) SegmentKey {
+	return SegmentKey(fmt.Sprintf("%s-%d/%020d", topic, partitionIndex, offset))
+}
+
+type SegmentType int
+
+const (
+	SegmentIndex SegmentType = iota
+	SegmentTimeIndex
+	SegmentLogFile
+)
+
+func (s SegmentKey) Format(typ SegmentType) string {
+	switch typ {
+	case SegmentIndex:
+		return fmt.Sprintf("%s.index", string(s))
+	case SegmentTimeIndex:
+		return fmt.Sprintf("%s.timeindex", string(s))
+	case SegmentLogFile:
+		return fmt.Sprintf("%s.log", string(s))
+	default:
+		panic("unrecognised index type")
+	}
 }
 
 func (s *TopicPartitionSegment) CommitRecord(rec *apiv1.Record, offset uint64) {

@@ -13,6 +13,25 @@ func (s SegmentPath) Valid() bool {
 	return true
 }
 
+func findLowestSegmentWithNearbyTimestamp(paths []string, target int64, pred func(offs uint64, ts int64) bool) int {
+	sp := parseSegmentPaths(paths)
+
+	l, r := 0, len(sp)-1
+	best := -1
+
+	for l <= r {
+		mid := l + ((r - l) / 2)
+		if pred(sp[mid], int64(target)) {
+			l = mid + 1
+			best = mid
+		} else {
+			r = mid - 1
+		}
+	}
+
+	return best
+}
+
 // Assumes that the input is ordered by low -> high
 func findLowestSegmentFile(paths []string, offset uint64) string {
 	log.Println("SEG_LU", offset, "IN", strings.Join(paths, ";"))
