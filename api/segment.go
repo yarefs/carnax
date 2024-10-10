@@ -14,21 +14,25 @@ import (
 type TopicPartitionSegment struct {
 	dataLog   *bytes.Buffer // .log
 	offsIndex *bytes.Buffer // .index
-	// .timeindex TBD
+	timeIndex *bytes.Buffer
 
 	len   uint64
 	start uint64
 
 	// watermark of this segment
-	low, high uint64
+	low, high     uint64
+	lowTs, highTs int64
 
 	bytesSinceLastIndexWrite uint64
 	config                   CarnaxConfig
-
-	timeIndex *bytes.Buffer
 }
 
-func (s *TopicPartitionSegment) Append(rec *apiv1.Record, offset uint64) {
+func (s *TopicPartitionSegment) CommitRecord(rec *apiv1.Record, offset uint64) {
+	/**
+	Here be dragons. There are some very crucially ordered
+	steps here to ensure particular guarantees.
+	*/
+
 	// specify watermark for this topic
 	if offset < s.low {
 		s.low = offset
@@ -38,7 +42,9 @@ func (s *TopicPartitionSegment) Append(rec *apiv1.Record, offset uint64) {
 	// which is the position this message will be written at.
 	initialWritePosition := s.len
 
-	if s.shouldWriteIndex() {
+	writeIndex := s.shouldWriteIndex()
+
+	if writeIndex {
 		_, err := protodelim.MarshalTo(s.offsIndex, &apiv1.Index{
 			Offset:   offset,
 			Position: s.len,
@@ -49,15 +55,7 @@ func (s *TopicPartitionSegment) Append(rec *apiv1.Record, offset uint64) {
 		s.bytesSinceLastIndexWrite = 0
 	}
 
-	// if should write to time offsIndex...
-	//s.timeIndex.Write()
-
-	recordBytes, err := proto.Marshal(rec)
-	if err != nil {
-		panic("Failed to marshal record")
-	}
-
-	// in most cases the metadata will not be set
+	// In most cases the metadata will not be set
 	// however, it is permissible, though unsafe, for
 	// producing clients to mangle this data if absolutely necessary.
 	if rec.Metadata != nil {
@@ -72,18 +70,53 @@ func (s *TopicPartitionSegment) Append(rec *apiv1.Record, offset uint64) {
 		}
 	}
 
-	// defensive measure to ensure checksums are only set once.
+	// Commit the timestamp watermark
+	timestamp := rec.Metadata.Timestamp
+	if rec.Headers.Timestamp != 0 {
+		// the header timestamp takes precedence
+		timestamp = rec.Headers.Timestamp
+	}
+	if timestamp < s.lowTs {
+		s.lowTs = timestamp
+	}
+	if timestamp > s.highTs {
+		s.highTs = timestamp
+	}
+
+	// Write a timestamp index log entry if necessary
+	if writeIndex {
+		_, err := protodelim.MarshalTo(s.timeIndex, &apiv1.TimeIndex{
+			Offset:    offset,
+			Timestamp: timestamp,
+		})
+		if err != nil {
+			panic(err)
+		}
+	}
+
+	// Defensive measure to ensure checksums are only set once.
 	if rec.Checksum != 0 {
 		panic("invalid state: checksum must not be set")
 	}
 
+	// Marhsal the record ONCE and generate a checksum
+	// the ordering here is CRUCIAL! as we have now committed
+	// metadata + so the checksum would include this.
+	recordBytes, err := proto.Marshal(rec)
+	if err != nil {
+		panic("Failed to marshal record")
+	}
+
+	// Write the final checksum just before we commit to the log.
 	rec.Checksum = crc32.ChecksumIEEE(recordBytes)
 
+	// Commit the record to log
 	numBytesWritten, err := protodelim.MarshalTo(s.dataLog, rec)
 	if err != nil {
 		panic(err)
 	}
 
+	// Vaguely calculates the next offset (it's not gauranteed with "SegmentIncrement")
 	nextOffs := offset + uint64(numBytesWritten)
 	if nextOffs > s.high {
 		s.high = nextOffs
@@ -95,6 +128,8 @@ func (s *TopicPartitionSegment) Append(rec *apiv1.Record, offset uint64) {
 
 // hm...
 type IndexFile []*apiv1.Index
+
+type TimeIndexFile []*apiv1.TimeIndex
 
 func (i IndexFile) Search(offs uint64) *apiv1.Index {
 	if len(i) == 0 {
@@ -126,8 +161,22 @@ func (i IndexFile) Search(offs uint64) *apiv1.Index {
 	return i[best]
 }
 
+func TimeIndexFromBytes(data []byte) TimeIndexFile {
+	buf := bytes.NewReader(data)
+
+	var res TimeIndexFile
+	for buf.Len() > 0 {
+		timeIndexEntry := new(apiv1.TimeIndex)
+		if err := protodelim.UnmarshalFrom(buf, timeIndexEntry); err != nil {
+			panic(err)
+		}
+		res = append(res, timeIndexEntry)
+	}
+	return res
+}
+
 func IndexFromBytes(data []byte) IndexFile {
-	buf := bytes.NewBuffer(data)
+	buf := bytes.NewReader(data)
 
 	var res IndexFile
 
@@ -152,7 +201,7 @@ func (s *TopicPartitionSegment) Data() []byte {
 }
 
 func (s *TopicPartitionSegment) TimeIndex() []byte {
-	return []byte{}
+	return s.timeIndex.Bytes()
 }
 
 func (s *TopicPartitionSegment) shouldWriteIndex() bool {

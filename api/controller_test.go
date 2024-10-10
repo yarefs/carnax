@@ -554,6 +554,8 @@ func (c *carnaxTestSuite) TestIndexByTimestampToOffset() {
 	err = c.controller.Flush()
 	assert.NoError(c.T(), err)
 
+	minRaftPropagationSleep()
+
 	// setup a consumer,
 	// seek to offset by timestamp
 	// poll message
@@ -570,5 +572,9 @@ func (c *carnaxTestSuite) TestIndexByTimestampToOffset() {
 		},
 	})
 
-	c.controller.Poll(cg.ConsumerGroupId, cg.ClientId, 15*time.Second)
+	pollResult, e := c.controller.Poll(cg.ConsumerGroupId, cg.ClientId, 15*time.Second)
+	assert.NoError(c.T(), e)
+
+	first := pollResult.Records[0]
+	assert.Equal(c.T(), "Record written on day 2", string(first.Payload))
 }

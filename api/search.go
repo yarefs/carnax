@@ -17,6 +17,29 @@ func (s SegmentPath) Valid() bool {
 func findLowestSegmentFile(paths []string, offset uint64) string {
 	log.Println("SEG_LU", offset, "IN", strings.Join(paths, ";"))
 
+	pathByOffset := parseSegmentPaths(paths)
+
+	left, right := 0, len(pathByOffset)-1
+	best := uint64(0)
+
+	for left <= right {
+		mid := left + ((right - left) / 2)
+		if pathByOffset[mid] <= offset {
+			left = mid + 1
+			best = pathByOffset[mid]
+		} else {
+			right = mid - 1
+		}
+	}
+
+	return offsetToPath(best)
+}
+
+func offsetToPath(best uint64) string {
+	return fmt.Sprintf("%020d", best)
+}
+
+func parseSegmentPaths(paths []string) []uint64 {
 	offs := make([]uint64, len(paths))
 
 	for i, p := range paths {
@@ -40,19 +63,5 @@ func findLowestSegmentFile(paths []string, offset uint64) string {
 
 		offs[i] = v
 	}
-
-	left, right := 0, len(offs)-1
-	best := uint64(0)
-
-	for left <= right {
-		mid := left + ((right - left) / 2)
-		if offs[mid] <= offset {
-			left = mid + 1
-			best = offs[mid]
-		} else {
-			right = mid - 1
-		}
-	}
-
-	return fmt.Sprintf("%020d", best)
+	return offs
 }

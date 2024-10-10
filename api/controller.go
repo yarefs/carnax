@@ -601,13 +601,38 @@ func (m *CarnaxController) softCommit(id string, clientId string, index uint32, 
 // OffsetsForTimes ...
 // default.api.timeout.ms
 func (m *CarnaxController) OffsetsForTimes(id string, clientId string, m2 map[*TopicPartitionHash]*apiv1.SeekIndex) {
-	// todo: shift into apply...
+	// todo: shift into apply?
 
 	for tph, seekIndex := range m2 {
 		// for given partition do index seeks by timestamp to an offset.
 		log.Println(tph.String(), "to", seekIndex)
 
-		// soft commit
+		m.seekOffset(id, clientId, tph, seekIndex)
+
+		// soft commit whatever we get back
 		//m.softCommit(id, clientId, 0, 0)
 	}
+}
+
+func (m *CarnaxController) seekOffset(id string, id2 string, tph *TopicPartitionHash, index *apiv1.SeekIndex) {
+	commandBytes, err := proto.Marshal(&commandv1.Command{
+		Type: commandv1.CommandType_COMMAND_TYPE_SEEK_OFFSET,
+		Command: &commandv1.Command_SeekOffset{
+			SeekOffset: &commandv1.SeekOffsetCommand{
+				ConsumerGroupId: id,
+				ClientId:        id2,
+				TopicPartition:  (*apiv1.TopicPartition)(tph),
+				SeekIndex:       index,
+			},
+		},
+	})
+	if err != nil {
+		panic(err)
+	}
+
+	res := m.getRaft().Apply(commandBytes, m.config.raftTimeout)
+	if err := res.Error(); err != nil {
+		panic(err)
+	}
+	res.Response()
 }

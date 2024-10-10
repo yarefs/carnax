@@ -4,6 +4,7 @@ package command.v1;
 import "api/v1/record.proto";
 import "api/v1/config.proto";
 import "api/v1/consumer.proto";
+import "api/v1/timeindex.proto";
 
 enum CommandType {
   COMMAND_TYPE_UNSPECIFIED = 0;
@@ -19,6 +20,7 @@ enum CommandType {
   COMMAND_TYPE_COMMIT_SYNC = 10;
   // ASYNC
   COMMAND_TYPE_SOFT_COMMIT = 11;
+  COMMAND_TYPE_SEEK_OFFSET = 12;
 }
 
 // an address is the offset AND partition index
@@ -59,6 +61,7 @@ message Command {
     PollMessagesCommand poll_messages = 10;
     CommitSyncCommand commit_sync = 11;
     SoftCommitCommand soft_commit = 12;
+    SeekOffsetCommand seek_offset = 13;
   }
 }
 
@@ -148,4 +151,14 @@ message SoftCommitCommand {
 
 message CommitSyncCommand {
   string consumer_group_id = 1;
+}
+
+message SeekOffsetCommand {
+  string consumer_group_id = 1;
+  string client_id = 2;
+
+  // hm...
+  api.v1.TopicPartition topic_partition = 3;
+
+  api.v1.SeekIndex seek_index = 4;
 }

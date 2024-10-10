@@ -81,6 +81,9 @@ func (f *CarnaxControllerFSM) Apply(l *raft.Log) interface{} {
 	case commandv1.CommandType_COMMAND_TYPE_SOFT_COMMIT:
 		sc := cmd.GetSoftCommit()
 		return f.applySoftCommit(sc.ConsumerGroupId, sc.ClientId, sc.PartitionIndex, sc.Offset)
+	case commandv1.CommandType_COMMAND_TYPE_SEEK_OFFSET:
+		so := cmd.GetSeekOffset()
+		return f.applySeekOffset(so.ConsumerGroupId, so.ClientId, so.TopicPartition, so.SeekIndex)
 	default:
 		panic("Command is not handled " + cmd.Type.String())
 	}
@@ -176,7 +179,7 @@ func (f *CarnaxControllerFSM) applyWrite(topic string, rec *apiv1.Record, addres
 	}
 
 	offset := address.Offset
-	segment.activeSegments[address.PartitionIndex].Append(rec, offset)
+	segment.activeSegments[address.PartitionIndex].CommitRecord(rec, offset)
 
 	return &commandv1.WriteMessageCommand_Response{
 		Address: address,
@@ -622,5 +625,18 @@ func (f *CarnaxControllerFSM) applySoftCommit(consumerGroupId string, clientId s
 
 	cgn.CurrentOffset[index] = offset
 
+	return nil
+}
+
+/**
+Segment metadata exists that covers the range of offsets
+this is IN MEMORY, which is the low and high watermark of
+offset and timestamp for each segment.
+Kafka is able to rebuild internal metadata from index files quickly. Disk writes are cheap here
+However when backed by an object-store we should think about an alternative strategy, e.g.
+checkpointing.
+*/
+
+func (f *CarnaxControllerFSM) applySeekOffset(id string, clientId string, topicPartition *apiv1.TopicPartition, seekIndex *apiv1.SeekIndex) interface{} {
 	return nil
 }

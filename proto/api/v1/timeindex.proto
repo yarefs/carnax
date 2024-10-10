@@ -2,6 +2,11 @@ syntax = "proto3";
 
 package api.v1;
 
+message TimeIndex {
+  int64 timestamp = 1;
+  uint64 offset = 2;
+}
+
 message SeekIndex {
   oneof whence {
     uint64 offset = 1;
