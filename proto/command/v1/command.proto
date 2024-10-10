@@ -157,7 +157,6 @@ message SeekOffsetCommand {
   string consumer_group_id = 1;
   string client_id = 2;
 
-  // hm...
   api.v1.TopicPartition topic_partition = 3;
 
   api.v1.SeekIndex seek_index = 4;

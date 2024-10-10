@@ -1076,11 +1076,10 @@ type SeekOffsetCommand struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	ConsumerGroupId string `protobuf:"bytes,1,opt,name=consumer_group_id,json=consumerGroupId,proto3" json:"consumer_group_id,omitempty"`
-	ClientId        string `protobuf:"bytes,2,opt,name=client_id,json=clientId,proto3" json:"client_id,omitempty"`
-	// hm...
-	TopicPartition *v1.TopicPartition `protobuf:"bytes,3,opt,name=topic_partition,json=topicPartition,proto3" json:"topic_partition,omitempty"`
-	SeekIndex      *v1.SeekIndex      `protobuf:"bytes,4,opt,name=seek_index,json=seekIndex,proto3" json:"seek_index,omitempty"`
+	ConsumerGroupId string             `protobuf:"bytes,1,opt,name=consumer_group_id,json=consumerGroupId,proto3" json:"consumer_group_id,omitempty"`
+	ClientId        string             `protobuf:"bytes,2,opt,name=client_id,json=clientId,proto3" json:"client_id,omitempty"`
+	TopicPartition  *v1.TopicPartition `protobuf:"bytes,3,opt,name=topic_partition,json=topicPartition,proto3" json:"topic_partition,omitempty"`
+	SeekIndex       *v1.SeekIndex      `protobuf:"bytes,4,opt,name=seek_index,json=seekIndex,proto3" json:"seek_index,omitempty"`
 }
 
 func (x *SeekOffsetCommand) Reset() {

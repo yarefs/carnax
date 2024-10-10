@@ -26,7 +26,6 @@ func TestConsumerRestart(t *testing.T) {
 	go func() {
 		m, s, sock := server.ListenAndServe(":1234", "/tmp/leader", 1, "leaderNode", true)
 
-		// hm.
 		go func() {
 			if err := s.Serve(sock); err != nil {
 				panic(err)

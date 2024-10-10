@@ -126,7 +126,6 @@ func (s *TopicPartitionSegment) CommitRecord(rec *apiv1.Record, offset uint64) {
 	s.bytesSinceLastIndexWrite += uint64(numBytesWritten)
 }
 
-// hm...
 type IndexFile []*apiv1.Index
 
 type TimeIndexFile []*apiv1.TimeIndex
