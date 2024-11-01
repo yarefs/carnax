@@ -17,8 +17,8 @@ The following list is a rough set of rules that apply to the carnax `log`.
    1. lock the shared state
    2. reserve an offset
    3. write into the segment for the topic-partition
-   4commit offset as latest
-   5unlock shared state
+   4. commit offset as latest
+   5. unlock shared state
 4. Flushing a segment
    1. lock the shared state AND make a new segment for concurrent/incoming writes
    2. compress into a final segment (with indexes)
