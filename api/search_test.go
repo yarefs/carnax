@@ -47,10 +47,10 @@ func Test_findOffsetByTimestamp(t *testing.T) {
 	}))
 	assert.NoError(t, err)
 
-	pred := SegmentByTimestamp(store, "orders", 0)
 	timestamp := int64(0x10)
-	best := findLowestSegmentWithNearbyTimestamp(segmentsList, timestamp, pred)
-	assert.Equal(t, 1, best)
+	best := findLowestOffsetNearTimestamp(segmentsList, timestamp, SegmentByTimestamp(store, "orders", 0))
+
+	assert.Equal(t, uint64(6010), best)
 }
 
 func Test_findExactMatch(t *testing.T) {

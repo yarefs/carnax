@@ -7,20 +7,17 @@ import (
 	"strings"
 )
 
-type SegmentPath string
-
-func (s SegmentPath) Valid() bool {
-	return true
-}
-
-type SegmentLookupPred func(u uint64, ts int64) bool
+// SegmentLookupPred should return if we found a matching
+// timestamp and also the nearest offset for this timestamp.
+// fixme: there is an implicit association with TimeIndex being used here.
+type SegmentLookupPred func(offs uint64, timestamp int64) (bool, uint64)
 
 func SegmentByTimestamp(store ObjectStore, topic string, partition uint32) SegmentLookupPred {
-	return func(u uint64, ts int64) bool {
+	return func(u uint64, ts int64) (bool, uint64) {
 		key := SegmentName(topic, partition, u).Format(SegmentTimeIndex)
 		data, err := store.Get(key)
 		if err != nil {
-			return false
+			return false, 0
 		}
 
 		index := TimeIndexFromBytes(data)
@@ -28,27 +25,27 @@ func SegmentByTimestamp(store ObjectStore, topic string, partition uint32) Segme
 			panic("empty index")
 		}
 
-		return ts >= index[0].Timestamp
+		return ts >= index[0].Timestamp, index[0].Offset
 	}
 }
 
-func findLowestSegmentWithNearbyTimestamp(paths []string, target int64, pred SegmentLookupPred) int {
+func findLowestOffsetNearTimestamp(paths []string, target int64, pred SegmentLookupPred) uint64 {
 	sp := parseSegmentPaths(paths)
 
 	l, r := 0, len(sp)-1
-	best := -1
+	result := uint64(0)
 
 	for l <= r {
 		mid := l + ((r - l) / 2)
-		if pred(sp[mid], target) {
+		if ok, offs := pred(sp[mid], target); ok {
 			l = mid + 1
-			best = mid
+			result = offs
 		} else {
 			r = mid - 1
 		}
 	}
 
-	return best
+	return result
 }
 
 // Assumes that the input is ordered by low -> high
