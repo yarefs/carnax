@@ -156,8 +156,11 @@ message CommitSyncCommand {
 message SeekOffsetCommand {
   string consumer_group_id = 1;
   string client_id = 2;
-
   api.v1.TopicPartition topic_partition = 3;
-
   api.v1.SeekIndex seek_index = 4;
+
+  message Response {
+    uint64 offset = 1;
+    bool found = 2;
+  }
 }

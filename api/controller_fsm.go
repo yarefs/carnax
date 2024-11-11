@@ -632,5 +632,18 @@ checkpointing.
 */
 
 func (f *CarnaxControllerFSM) applySeekOffset(id string, clientId string, topicPartition *apiv1.TopicPartition, seekIndex *apiv1.SeekIndex) interface{} {
-	return nil
+
+	targetTimestamp := seekIndex.GetTime()
+	segs := []string{}
+	offset := findLowestOffsetNearTimestamp(segs, targetTimestamp, SegmentByTimestamp(f.storeBackedLog, topicPartition.Topic, topicPartition.PartitionIndex))
+
+	// edgecase: is it offset zero or did we just fail
+	// to find the right offset?
+
+	return &commandv1.SeekOffsetCommand_Response{
+		Offset: offset,
+
+		// nit: we have no way to capture this yet.
+		Found: true,
+	}
 }
